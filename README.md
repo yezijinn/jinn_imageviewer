@@ -16,13 +16,13 @@
 
 ## 截图
 
-| 启动页面 | 双列展示 |
+| 启动页面 | 单图展示 |
 |:--------:|:--------:|
-| <img src="screenshots/启动页面.png" width="480"/> | <img src="screenshots/双列展示.png" width="480"/> |
+| <img src="screenshots/启动页面.png" width="480"/> | <img src="screenshots/单图展示.png" width="480"/> |
 
-| 菜单栏 |
-|:------:|
-| <img src="screenshots/菜单.png" width="480"/> |
+| 双列展示 | 菜单栏 |
+|:--------:|:------:|
+| <img src="screenshots/双列展示.png" width="480"/> | <img src="screenshots/菜单.png" width="480"/> |
 
 ---
 
@@ -76,9 +76,6 @@ cargo build --release
 
 编译产物位于 `target/release/jinn-imageviewer.exe`。
 
-### 一键编译
-
-双击项目根目录的 `一键编译.bat`，自动检查环境、编译、复制 exe。日志输出到 `build_log.txt`。
 
 ---
 
@@ -92,8 +89,7 @@ jinn_imageviewer/
 ├── src/
 │   └── main.rs         # 全部源码
 ├── icons/PNG/          # 图标源文件 (16/32/48/64/128/256)
-├── screenshots/        # 截图
-└── 一键编译.bat         # 一键编译脚本
+└── screenshots/        # 截图
 ```
 
 ---
