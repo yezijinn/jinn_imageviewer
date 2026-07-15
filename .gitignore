@@ -1,0 +1,43 @@
+# ==========================
+# Rust
+# ==========================
+/target/
+
+# ==========================
+# 项目特定
+# ==========================
+/python_version/
+build_log.txt
+build_exe.bat
+list_files.bat
+copy/
+*.exe
+
+# ==========================
+# IDE
+# ==========================
+.vscode/
+.vs/
+*.slnx
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.idea/
+
+# ==========================
+# OS
+# ==========================
+Thumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+._*
+*~
+
+# ==========================
+# Misc
+# ==========================
+*.log
+*.sqlite

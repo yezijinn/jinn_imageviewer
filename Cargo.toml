@@ -1,0 +1,14 @@
+[package]
+name = "jinn-imageviewer"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+eframe = "0.31"
+image = "0.25"
+rfd = "0.15"
+raw-window-handle = "0.6"
+open = "5.0"
+
+[build-dependencies]
+winres = "0.1"
