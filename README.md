@@ -28,7 +28,7 @@
 
 ## 功能
 
-- **文件夹浏览** — 打开文件夹，自动扫描 PNG/JPG/JPEG 图片，自然排序
+- **文件夹浏览** — 打开文件夹，自动扫描 PNG/JPG/JPEG/BMP/GIF/WebP/TIFF 图片，自然排序
 - **键盘导航** — 方向键切换图片，循环跳转（末张→首张，首张→末张）
 - **双列模式** — F2 切换左右并排对比浏览
 - **鼠标滚轮缩放** — 滚轮缩放，自动退出适应窗口模式，步长可调
@@ -76,7 +76,6 @@ cargo build --release
 
 编译产物位于 `target/release/jinn-imageviewer.exe`。
 
-
 ---
 
 ## 项目结构
@@ -84,7 +83,8 @@ cargo build --release
 ```
 jinn_imageviewer/
 ├── Cargo.toml          # 项目配置和依赖
-├── build.rs            # 编译脚本：嵌入 exe 图标
+├── Cargo.lock          # 依赖锁定
+├── build.rs            # 编译脚本：嵌入 exe 图标 + 生成编译日期版本号
 ├── app_icon.ico        # 应用图标
 ├── src/
 │   └── main.rs         # 全部源码
@@ -99,11 +99,12 @@ jinn_imageviewer/
 | 依赖 | 用途 |
 |------|------|
 | [eframe](https://crates.io/crates/eframe) 0.31 | GUI 框架 (基于 egui) |
-| [image](https://crates.io/crates/image) 0.25 | 图片解码 (PNG/JPG/BMP/GIF/WebP) |
+| [image](https://crates.io/crates/image) 0.25 | 图片解码 (PNG/JPG/BMP/GIF/WebP/TIFF) |
 | [rfd](https://crates.io/crates/rfd) 0.15 | 原生文件选择对话框 |
 | [raw-window-handle](https://crates.io/crates/raw-window-handle) 0.6 | 获取窗口原生句柄 (暗黑标题栏) |
 | [open](https://crates.io/crates/open) 5.0 | 打开外部链接 |
 | [winres](https://crates.io/crates/winres) 0.1 | 编译时嵌入 Windows 图标资源 |
+| [chrono](https://crates.io/crates/chrono) 0.4 | 编译时生成版本号日期 |
 
 ---
 

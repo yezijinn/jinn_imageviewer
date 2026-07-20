@@ -4,6 +4,8 @@
 // 隐藏Windows控制台窗口
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 
+include!(concat!(env!("OUT_DIR"), "/build_date.rs"));
+
 use eframe::egui;
 use egui::{ColorImage, TextureHandle, Vec2};
 use image::GenericImageView;
@@ -11,7 +13,7 @@ use rfd::FileDialog;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use open::that; // 添加open库用于打开GitHub链接
+use open::that;
 
 // ============================================================================ 
 // Windows dark titlebar FFI - module level extern block 
@@ -160,15 +162,15 @@ impl ShortcutAction {
     /// 获取动作的显示标签
     fn label(&self) -> &'static str {
         match self {
-            Self::OpenFolder => "\u{6253}\u{5F00}\u{6587}\u{4EF6}\u{5939}",
-            Self::PrevImage => "\u{4E0A}\u{4E00}\u{5F20}",
-            Self::NextImage => "\u{4E0B}\u{4E00}\u{5F20}",
-            Self::DeleteImage => "\u{5220}\u{9664}\u{56FE}\u{7247}",
-            Self::ToggleDual => "\u{53CC}\u{5217}\u{5C55}\u{793A}",
-            Self::CopyLeft => "\u{590D}\u{5236}\u{56FE}\u{7247}(\u{5DE6}/\u{5F53}\u{524D})",
-            Self::CopyRight => "\u{590D}\u{5236}\u{56FE}\u{7247}(\u{53F3})",
-            Self::ToggleFit => "\u{9002}\u{5E94}\u{7A97}\u{53E3} (\u{9F20}\u{6807}\u{53F3}\u{952E})",
-            Self::About => "\u{5173}\u{4E8E}", // 新增关于标签
+            Self::OpenFolder => "打开文件夹",
+            Self::PrevImage => "上一张",
+            Self::NextImage => "下一张",
+            Self::DeleteImage => "删除图片",
+            Self::ToggleDual => "双列展示",
+            Self::CopyLeft => "复制图片(左/当前)",
+            Self::CopyRight => "复制图片(右)",
+            Self::ToggleFit => "适应窗口 (鼠标右键)",
+            Self::About => "关于",
         }
     }
 }
@@ -333,7 +335,10 @@ impl JinnImageViewer {
         self.status_message.clear();
 
         let supported_ext = |ext: &std::ffi::OsStr| -> bool {
-            matches!(ext.to_str().unwrap_or("").to_lowercase().as_str(), "png" | "jpg" | "jpeg")
+            matches!(
+                ext.to_str().unwrap_or("").to_lowercase().as_str(),
+                "png" | "jpg" | "jpeg" | "bmp" | "gif" | "webp" | "tiff" | "tif"
+            )
         };
 
         let mut entries: Vec<ImageEntry> = Vec::new();
@@ -356,7 +361,7 @@ impl JinnImageViewer {
         self.folder_path = Some(folder);
 
         if self.images.is_empty() {
-            self.status_message = "\u{6587}\u{4EF6}\u{5939}\u{4E2D}\u{6CA1}\u{6709}\u{627E}\u{5230}\u{56FE}\u{7247}\u{6587}\u{4EF6} (.png/.jpg/.jpeg)".to_string();
+            self.status_message = "文件夹中没有找到图片文件 (.png/.jpg/.jpeg/.bmp/.gif/.webp/.tiff)".to_string();
         } else {
             self.status_message.clear();
         }
@@ -364,17 +369,21 @@ impl JinnImageViewer {
 
     // ---- Navigation ---------------------------------------------------------
     /// 导航到指定图片
-    fn navigate(&mut self, step: i32) {
+    /// direction: 正数向后，负数向前
+    fn navigate(&mut self, direction: i32) {
         if self.images.is_empty() { return; }
         let len = self.images.len() as i32;
-        let mut new_idx = self.current_index as i32 + step;
+        let step = if self.two_column { 2i32 } else { 1i32 };
+        let mut new_idx = self.current_index as i32 + step * direction;
 
         if new_idx < 0 {
-            if self.two_column {
-                new_idx = ((len - 1) / 2) * 2;
+            // 向后循环：找到最后一个有效索引
+            new_idx = if self.two_column {
+                let last_even = if len % 2 == 0 { len - 2 } else { len - 1 };
+                last_even
             } else {
-                new_idx = len - 1;
-            }
+                len - 1
+            };
         } else if new_idx >= len {
             new_idx = 0;
         }
@@ -395,18 +404,18 @@ impl JinnImageViewer {
                 self.textures.remove(&path);
                 self.images.remove(self.current_index);
                 if self.images.is_empty() {
-                    self.current_index = 0;
-                    self.status_message = "\u{6240}\u{6709}\u{56FE}\u{7247}\u{5DF2}\u{5220}\u{9664}".to_string();
-                } else {
-                    if self.current_index >= self.images.len() {
-                        self.current_index = self.images.len() - 1;
-                    }
-                    self.status_message = format!("\u{5DF2}\u{5220}\u{9664}: {}", path.file_name().unwrap_or_default().to_string_lossy());
+                self.current_index = 0;
+                self.status_message = "所有图片已删除".to_string();
+            } else {
+                if self.current_index >= self.images.len() {
+                    self.current_index = self.images.len() - 1;
+                }
+                self.status_message = format!("已删除: {}", path.file_name().unwrap_or_default().to_string_lossy());
                 }
                 self.cleanup_textures();
             }
             Err(e) => {
-                self.status_message = format!("\u{5220}\u{9664}\u{5931}\u{8D25}: {}", e);
+                self.status_message = format!("删除失败: {}", e);
             }
         }
     }
@@ -417,7 +426,7 @@ impl JinnImageViewer {
         if self.images.is_empty() { return; }
         let idx = self.current_index + offset;
         if idx >= self.images.len() {
-            self.status_message = "\u{5F53}\u{524D}\u{6CA1}\u{6709}\u{53F3}\u{56FE}\u{53EF}\u{590D}\u{5236}".to_string();
+            self.status_message = "当前没有右图可复制".to_string();
             return;
         }
 
@@ -434,14 +443,14 @@ impl JinnImageViewer {
         let dest = copy_dir.join(&name);
         
         if dest.exists() {
-            self.copy_error_msg = "\u{56FE}\u{7247}\u{5DF2}\u{5B58}\u{5728}\u{FF0C}\u{5DF2}\u{7981}\u{6B62}\u{590D}\u{5236}\u{3002}".to_string();
+            self.copy_error_msg = "图片已存在，已禁止复制。".to_string();
             self.show_copy_error_dialog = true;
             return;
         }
 
         match std::fs::copy(&src, &dest) {
-            Ok(_) => self.status_message = format!("\u{590D}\u{5236}\u{540E}\u{5B58}\u{653E}\u{8DEF}\u{5F84}: {}", dest.display()),
-            Err(e) => self.status_message = format!("\u{590D}\u{5236}\u{5931}\u{8D25}: {}", e),
+            Ok(_) => self.status_message = format!("复制后存放路径: {}", dest.display()),
+            Err(e) => self.status_message = format!("复制失败: {}", e),
         }
     }
 
@@ -533,54 +542,53 @@ impl JinnImageViewer {
     /// 显示菜单栏
     fn show_menu(&mut self, ui: &mut egui::Ui) {
         egui::menu::bar(ui, |ui| {
-            ui.menu_button("\u{6587}\u{4EF6}", |ui| {
-                if ui.button("\u{6253}\u{5F00}\u{6587}\u{4EF6}\u{5939}").clicked() {
+            ui.menu_button("文件", |ui| {
+                if ui.button("打开文件夹").clicked() {
                     ui.close_menu();
                     self.open_folder();
                 }
-                if ui.button("\u{9000}\u{51FA}").clicked() {
+                if ui.button("退出").clicked() {
                     ui.close_menu();
                     std::process::exit(0);
                 }
             });
 
-            ui.menu_button("\u{89C6}\u{56FE}", |ui| {
-                if ui.button("\u{4E0A}\u{4E00}\u{5F20}").clicked() {
+            ui.menu_button("视图", |ui| {
+                if ui.button("上一张").clicked() {
                     ui.close_menu();
                     let step = if self.two_column { 2 } else { 1 };
                     self.navigate(-step);
                 }
-                if ui.button("\u{4E0B}\u{4E00}\u{5F20}").clicked() {
+                if ui.button("下一张").clicked() {
                     ui.close_menu();
                     let step = if self.two_column { 2 } else { 1 };
                     self.navigate(step);
                 }
                 ui.separator();
-                if ui.checkbox(&mut self.fit_to_window, "\u{9002}\u{5E94}\u{7A97}\u{53E3}").clicked() {
+                if ui.checkbox(&mut self.fit_to_window, "适应窗口").clicked() {
                     ui.close_menu();
                 }
-                if ui.checkbox(&mut self.two_column, "\u{53CC}\u{5217}\u{5C55}\u{793A}").clicked() {
+                if ui.checkbox(&mut self.two_column, "双列展示").clicked() {
                     ui.close_menu();
                 }
             });
 
-            ui.menu_button("\u{8bbe}\u{7f6e}", |ui| {
-                if ui.button("\u{81ea}\u{5b9a}\u{4e49}\u{5feb}\u{6377}\u{952e}").clicked() {
+            ui.menu_button("设置", |ui| {
+                if ui.button("自定义快捷键").clicked() {
                     ui.close_menu();
                     self.show_shortcuts_window = true;
                 }
                 ui.separator();
-                if ui.button("\u{590d}\u{5236}\u{56fe}\u{7247}(\u{5de6}/\u{5f53}\u{524d})").clicked() {
+                if ui.button("复制图片(左/当前)").clicked() {
                     ui.close_menu();
                     self.copy_image(0);
                 }
-                if ui.button("\u{590d}\u{5236}\u{56fe}\u{7247}(\u{53f3})").clicked() {
+                if ui.button("复制图片(右)").clicked() {
                     ui.close_menu();
                     if self.two_column { self.copy_image(1); }
                 }
                 ui.separator();
-                // 新增关于按钮
-                if ui.button("\u{5173}\u{4e8e}").clicked() {
+                if ui.button("关于").clicked() {
                     ui.close_menu();
                     self.show_about_window = true;
                 }
@@ -597,7 +605,7 @@ impl JinnImageViewer {
                 return;
             }
             if self.images.is_empty() {
-                ui.label("\u{672a}\u{52a0}\u{8f7d}\u{56fe}\u{7247} \u{2014} \u{53cc}\u{51fb}\u{6216}\u{6309} O \u{6253}\u{5f00}\u{6587}\u{4ef6}\u{5939}");
+                ui.label("未加载图片 — 双击或按 O 打开文件夹");
                 return;
             }
             let idx = self.current_index;
@@ -606,10 +614,10 @@ impl JinnImageViewer {
                 ui.separator();
                 ui.label(format!("{}/{}", idx + 1, self.images.len()));
                 ui.separator();
-                ui.label(format!("\u{7f29}\u{653e}: {:.0}%", self.scale_factor * 100.0));
+                ui.label(format!("缩放: {:.0}%", self.scale_factor * 100.0));
                 if self.two_column && idx + 1 < self.images.len() {
                     ui.separator();
-                    ui.label(format!("\u{53f3}: {}", self.images[idx + 1].name));
+                    ui.label(format!("右: {}", self.images[idx + 1].name));
                 }
             }
         });
@@ -618,11 +626,11 @@ impl JinnImageViewer {
     // ---- Shortcut config window content -------------------------------------
     /// 显示快捷键配置窗口内容
     fn show_shortcuts_window_content(&mut self, ui: &mut egui::Ui, request_close: &mut bool) {
-        ui.heading("\u{81ea}\u{5b9a}\u{4e49}\u{5feb}\u{6377}\u{952e}");
+        ui.heading("自定义快捷键");
         ui.separator();
 
         ui.horizontal(|ui| {
-            ui.label("\u{9f20}\u{6807}\u{6eda}\u{8f6e}\u{7f29}\u{653e}\u{6b65}\u{957f} (%):");
+            ui.label("鼠标滚轮缩放步长 (%):");
             ui.add(egui::DragValue::new(&mut self.zoom_step_percent).range(1.0..=100.0).speed(0.1));
         });
         ui.separator();
@@ -679,19 +687,19 @@ impl JinnImageViewer {
             }
             ui.add_space(8.0);
             ui.horizontal(|ui| {
-                if ui.button("\u{4fdd}\u{5b58}\u{8bbe}\u{7f6e}").clicked() {
-                    self.status_message = "\u{5feb}\u{6377}\u{952e}\u{8bbe}\u{7f6e}\u{5df2}\u{4fdd}\u{5b58}".to_string();
+                if ui.button("保存设置").clicked() {
+                    self.status_message = "快捷键设置已保存".to_string();
                 }
-                if ui.button("\u{6062}\u{590d}\u{9ed8}\u{8ba4}").clicked() {
+                if ui.button("恢复默认").clicked() {
                     self.shortcuts = ShortcutConfig::defaults();
                     self.zoom_step_percent = 10.0;
-                    self.status_message = "\u{5df2}\u{6062}\u{590d}\u{9ed8}\u{8ba4}\u{8bbe}\u{7f6e}".to_string();
+                    self.status_message = "已恢复默认设置".to_string();
                 }
             });
             ui.add_space(4.0);
-            ui.label(egui::RichText::new("\u{6e29}\u{9986}\u{63d0}\u{793a}: \u{9f20}\u{6807}\u{53f3}\u{952e}\u{5728}\u{56fe}\u{7247}\u{533a}\u{57df}\u{70b9}\u{51fb}\u{53ef}\u{5feb}\u{901f}\u{9002}\u{5e94}\u{7a97}\u{53e3}").color(egui::Color32::from_gray(120)).small());
+            ui.label(egui::RichText::new("温馨提示: 鼠标右键在图片区域点击可快速适应窗口").color(egui::Color32::from_gray(120)).small());
             ui.vertical_centered(|ui| {
-                if ui.button("\u{5173}\u{95ed}\u{7a97}\u{53e3}").clicked() {
+                if ui.button("关闭窗口").clicked() {
                     *request_close = true;
                 }
             });
@@ -700,19 +708,17 @@ impl JinnImageViewer {
 
     // ---- About window content -------------------------------------
     /// 显示关于窗口
-    fn show_about_window(&mut self, ctx: &egui::Context) {
-        egui::Window::new("\u{5173}\u{4e8e}")
+    fn show_about_window_content(&mut self, ctx: &egui::Context) {
+        egui::Window::new("关于")
             .open(&mut self.show_about_window)
             .resizable(false)
             .show(ctx, |ui| {
                 ui.vertical_centered(|ui| {
-                    ui.label(format!("Jinn\u{56fe}\u{7247}\u{67e5}\u{770b}\u{5668} v{}", "20260715"));
-                    ui.label("\u{4f5c}\u{8005}: \u{53f6}\u{5b50}Jinn");
-                    // 修复：使用format!正确拼接字符串
-                    if ui.button(format!("{}GitHub{}", "\u{8bbf}\u{95ee}", "\u{9879}\u{76ee}")).clicked() {
-                        if let Err(e) = that("https://github.com/yezjinn/jinn_imageviewer") {
-                            // 修复：正确使用format!宏
-                            self.status_message = format!("{}GitHub{}: {}", "\u{6253}\u{5f00}", "\u{5931}\u{8d25}", e);
+                    ui.label(format!("Jinn图片查看器 v{}", BUILD_DATE));
+                    ui.label("作者: 叶子Jinn");
+                    if ui.button("访问GitHub项目").clicked() {
+                        if let Err(e) = that("https://github.com/yezijinn/jinn_imageviewer") {
+                            self.status_message = format!("打开GitHub失败: {}", e);
                         }
                     }
                 });
@@ -729,7 +735,7 @@ impl JinnImageViewer {
             painter.text(
                 rect.center(),
                 egui::Align2::CENTER_CENTER,
-                "\u{6253}\u{5f00}\u{6587}\u{4ef6}\u{5939}\u{4ee5}\u{67e5}\u{770b}\u{56fe}\u{7247}\n\n\u{53cc}\u{51fb}\u{6b64}\u{5904} \u{6216} \u{6309} O \u{952e}",
+                "打开文件夹以查看图片\n\n双击此处 或 按 O 键",
                 egui::FontId::proportional(18.0),
                 egui::Color32::from_gray(160),
             );
@@ -771,7 +777,7 @@ impl JinnImageViewer {
         let texture = match self.get_or_load_texture(ctx, &path) {
             Some(t) => t,
             None => {
-                ui.label("\u{52a0}\u{8f7d}\u{56fe}\u{7247}\u{5931}\u{8d25}");
+                ui.label("加载图片失败");
                 return;
             }
         };
@@ -929,7 +935,7 @@ impl eframe::App for JinnImageViewer {
         });
 
         if self.show_copy_error_dialog {
-            egui::Window::new("\u{63d0}\u{793a}")
+            egui::Window::new("提示")
                 .collapsible(false)
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
@@ -938,7 +944,7 @@ impl eframe::App for JinnImageViewer {
                         ui.add_space(10.0);
                         ui.label(&self.copy_error_msg);
                         ui.add_space(10.0);
-                        if ui.button("\u{786e}\u{5b9a}").clicked() {
+                        if ui.button("确定").clicked() {
                             self.show_copy_error_dialog = false;
                         }
                     });
@@ -948,7 +954,7 @@ impl eframe::App for JinnImageViewer {
         if self.show_shortcuts_window {
             let mut open = self.show_shortcuts_window;
             let mut request_close = false;
-            egui::Window::new("\u{81ea}\u{5b9a}\u{4e49}\u{5feb}\u{6377}\u{952e}")
+            egui::Window::new("自定义快捷键")
                 .open(&mut open)
                 .resizable(true)
                 .default_width(400.0)
@@ -964,7 +970,7 @@ impl eframe::App for JinnImageViewer {
 
         // 处理关于窗口
         if self.show_about_window {
-            self.show_about_window(ctx);
+            self.show_about_window_content(ctx);
         }
     }
 }
@@ -979,20 +985,20 @@ fn main() {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1200.0, 800.0])
             .with_min_inner_size([400.0, 300.0])
-            .with_title("Jinn\u{56FE}\u{7247}\u{67E5}\u{770B}\u{5668}")
+            .with_title("Jinn图片查看器")
             .with_icon(icon),
         ..Default::default()
     };
 
     eframe::run_native(
-        "Jinn\u{56FE}\u{7247}\u{67E5}\u{770B}\u{5668}",
+        "Jinn图片查看器",
         native_options,
         Box::new(|cc| {
             setup_chinese_fonts(&cc);
             Ok(Box::new(JinnImageViewer::new()))
         }),
     )
-    .expect("Failed to run Jinn\u{56FE}\u{7247}\u{67E5}\u{770B}\u{5668}");
+    .expect("Failed to run Jinn图片查看器");
 }
 
 // ============================================================================ 
