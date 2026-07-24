@@ -4,7 +4,7 @@
 
 - **类型**: 单文件 Rust 桌面 GUI 应用（Windows-only）
 - **框架**: egui via `eframe` 0.31
-- **源码**: 全部在 `src/main.rs`（~1000 行），无 crate 拆分
+- **源码**: 全部在 `src/main.rs`（~940 行），无 crate 拆分
 - **构建产物**: `target/release/jinn-imageviewer.exe`
 - **图片格式**: 支持 PNG/JPG/JPEG/BMP/GIF/WebP/TIFF（由 `image` crate 决定）
 
@@ -18,10 +18,12 @@ cargo build --release
 target/release/jinn-imageviewer.exe
 ```
 
+**快捷脚本**: `build_exe.bat` 自动检测环境、构建并复制为 `Jinn图片查看器.exe`（首次构建约 5-10 分钟）
+
 **平台约束**:
 - Windows-only（`#![windows_subsystem = "windows"]` 隐藏控制台）
 - 需要 MSVC 工具链（`stable-x86_64-pc-windows-msvc`）
-- `build.rs` 在 Windows 上嵌入 `app_icon.ico` 为 exe 图标（依赖 `winres`）
+- `build.rs` 嵌入 `app_icon.ico` 为 exe 图标（依赖 `winres`）并生成编译日期版本号（`BUILD_DATE` 常量）
 
 ## 开发注意事项
 
@@ -29,6 +31,7 @@ target/release/jinn-imageviewer.exe
 - **中文字体加载**: 运行时从 `C:\Windows\Fonts\` 加载（simhei / simsunb / simkai / simfang / msyh），Windows 外运行会静默跳过
 - **FFI 依赖**: 使用 `dwmapi` 设置暗黑标题栏，仅 Windows 有效
 - **文件操作**: Delete 键直接删除图片（无确认弹窗）；复制到 exe 同级 `copy/` 目录
+- **自然排序**: 文件名按数字和文本片段分割排序（`natural_cmp` 函数），避免字典序问题（如 `img10.jpg` 排在 `img2.jpg` 后）
 
 ## 快捷操作（运行时）
 
