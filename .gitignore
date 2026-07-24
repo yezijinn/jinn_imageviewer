@@ -1,34 +1,33 @@
-# ==========================
-# Rust
-# ==========================
+# Rust build output
 /target/
-/Cargo.lock
 
-# ==========================
-# 项目特定
-# ==========================
-/python_version/
-build_log.txt
-build_exe.bat
-list_files.bat
-copy/
+# Generated application artifacts
 *.exe
+/copy/
+/build_log.txt
+/*.txt
+/list_files.bat
 
-# ==========================
-# IDE
-# ==========================
-.vscode/
-.vs/
+# Legacy implementation not used by the Rust build
+/python_version/
+
+# Local IDE state
+/.vs/
+/.vscode/
+/.idea/
 *.slnx
 *.suo
 *.user
 *.userosscache
 *.sln.docstates
-.idea/
 
-# ==========================
-# OS
-# ==========================
+# Local agent/tool caches
+/.codegraph/
+/.omo/
+/.uploads/
+/.debug-journal.md
+
+# Operating-system files
 Thumbs.db
 ehthumbs_vista.db
 Desktop.ini
@@ -37,8 +36,14 @@ $RECYCLE.BIN/
 ._*
 *~
 
-# ==========================
-# Misc
-# ==========================
+# Logs and local databases
 *.log
 *.sqlite
+*.sqlite3
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Keep Cargo.lock: this is an application, not a library.
