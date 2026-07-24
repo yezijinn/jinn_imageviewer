@@ -981,25 +981,44 @@ impl JinnImageViewer {
 
     /// 处理通过 IPC 传入的路径（文件关联双击或第二个实例的命令行参数）。
     /// 该路径将被当作文件打开，自动加载其所在目录并定位到该文件。
+    /// 如果已在同一目录，直接导航到目标图片而不重扫整个目录。
     fn handle_ipc_paths(&mut self, ctx: &egui::Context) {
         while let Ok(path_str) = self.ipc_rx.try_recv() {
             let path = std::path::PathBuf::from(&path_str);
             if path.is_dir() {
+                self.set_status(format!("{}: {}", self.i18n.t("status_opening_folder"), path.display()));
                 self.load_folder(path);
             } else if path.is_file() {
-                if let Some(ext) = path.extension() {
-                    if !crate::image::is_supported_ext(ext) {
-                        continue;
-                    }
-                } else {
+                let ext = match path.extension() {
+                    Some(e) => e,
+                    None => continue,
+                };
+                if !crate::image::is_supported_ext(ext) {
                     continue;
                 }
-                if let Some(parent) = path.parent() {
-                    self.load_folder(parent.to_path_buf());
-                    let file_name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+                let parent = match path.parent() {
+                    Some(p) => p.to_path_buf(),
+                    None => continue,
+                };
+                let file_name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+
+                // 已在同一目录 → 直接导航到目标图片，不清空纹理缓存
+                if self.folder_path.as_deref() == Some(&parent) {
                     if let Some(pos) = self.images.iter().position(|img| img.name == file_name) {
                         self.current_index = pos;
+                        self.fit_to_window = true;
+                        self.needs_preload = true;
+                        self.set_status(file_name);
+                        ctx.request_repaint();
+                        continue;
                     }
+                }
+
+                // 不同目录 → 完整重新加载
+                self.load_folder(parent);
+                if let Some(pos) = self.images.iter().position(|img| img.name == file_name) {
+                    self.current_index = pos;
+                    self.set_status(file_name);
                 }
             }
             ctx.request_repaint();
