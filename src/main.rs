@@ -10,9 +10,11 @@ use jinn_imageviewer::*;
 // Entry point
 // ============================================================================
 fn main() {
-    // 单实例检测（Windows 命名互斥体）
+    // ============================================================================
+    // 单实例检测（Windows 命名互斥体）+ IPC 路径转发
+    // ============================================================================
     #[cfg(target_os = "windows")]
-    let _mutex = {
+    let (_mutex, ipc_rx) = {
         use std::os::windows::ffi::OsStrExt;
         let name: Vec<u16> = std::ffi::OsStr::new("Global\\JinnImageViewer_SingleInstance")
             .encode_wide()
@@ -35,13 +37,25 @@ fn main() {
         // thread's Windows error state immediately after CreateMutexW.
         let last_error = unsafe { windows_sys::Win32::Foundation::GetLastError() };
         if last_error == 183 {
-            // ERROR_ALREADY_EXISTS - 已有实例运行
-            // 未来可通过 IPC 传递参数给已运行实例，当前直接退出
+            // ERROR_ALREADY_EXISTS — 已有实例运行，通过 IPC 转发命令行参数后退出
+            let args: Vec<String> = std::env::args().skip(1).collect();
+            if !args.is_empty() {
+                ipc::send_path(&args[0]);
+            }
             return;
         }
-        handle
+        // 第一实例：启动命名管道服务器，接收后续实例的路径
+        let (tx, rx) = std::sync::mpsc::channel();
+        ipc::start_server(tx);
+        (handle, rx)
     };
 
+    #[cfg(not(target_os = "windows"))]
+    let (_mutex, ipc_rx) = ((), std::sync::mpsc::channel::<String>().1);
+
+    // ============================================================================
+    // 窗口初始化
+    // ============================================================================
     let icon = image::load_icon_from_bytes(include_bytes!("../icons/PNG/icon_256.png"));
 
     let native_options = eframe::NativeOptions {
@@ -59,7 +73,7 @@ fn main() {
         native_options,
         Box::new(|cc| {
             setup_chinese_fonts(cc);
-            let mut viewer = app::JinnImageViewer::new();
+            let mut viewer = app::JinnImageViewer::new(ipc_rx);
             viewer.load_config();
             viewer.load_from_args();
             Ok(Box::new(viewer))

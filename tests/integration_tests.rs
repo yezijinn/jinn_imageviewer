@@ -1,3 +1,5 @@
+#![allow(clippy::field_reassign_with_default)]
+
 use eframe::egui;
 use jinn_imageviewer::app::JinnImageViewer;
 use jinn_imageviewer::image::scan_folder;
@@ -32,7 +34,7 @@ fn create_test_image(path: &Path, format: image::ImageFormat) -> std::io::Result
 
 #[test]
 fn test_app_initialization() {
-    let app = JinnImageViewer::new();
+    let app = JinnImageViewer::default();
     assert_eq!(app.images.len(), 0, "新应用应无图片");
     assert_eq!(app.current_index, 0);
     assert_eq!(app.scale_factor, 1.0);
@@ -45,7 +47,7 @@ fn test_window_title_uses_current_image() {
     let temp = setup_test_dir().unwrap();
     create_test_image(&temp.join("current.png"), image::ImageFormat::Png).unwrap();
 
-    let mut app = JinnImageViewer::new();
+    let mut app = JinnImageViewer::default();
     app.images = scan_folder(&temp);
 
     assert_eq!(app.window_title(), "current.png - Jinn Image Viewer");
@@ -59,7 +61,7 @@ fn test_shortcut_key_labels_round_trip() {
 
 #[test]
 fn test_navigate_empty_list() {
-    let mut app = JinnImageViewer::new();
+    let mut app = JinnImageViewer::default();
     app.navigate(1);
     assert_eq!(app.current_index, 0, "空列表导航应无变化");
     app.navigate(-1);
@@ -73,7 +75,7 @@ fn test_navigate_forward() {
     create_test_image(&temp.join("b.png"), image::ImageFormat::Png).unwrap();
     create_test_image(&temp.join("c.png"), image::ImageFormat::Png).unwrap();
 
-    let mut app = JinnImageViewer::new();
+    let mut app = JinnImageViewer::default();
     app.images = scan_folder(&temp);
     assert_eq!(app.images.len(), 3);
 
@@ -89,7 +91,7 @@ fn test_navigate_backward() {
     create_test_image(&temp.join("a.png"), image::ImageFormat::Png).unwrap();
     create_test_image(&temp.join("b.png"), image::ImageFormat::Png).unwrap();
 
-    let mut app = JinnImageViewer::new();
+    let mut app = JinnImageViewer::default();
     app.images = scan_folder(&temp);
     app.current_index = 1;
 
@@ -103,7 +105,7 @@ fn test_navigate_wrap_around() {
     create_test_image(&temp.join("a.png"), image::ImageFormat::Png).unwrap();
     create_test_image(&temp.join("b.png"), image::ImageFormat::Png).unwrap();
 
-    let mut app = JinnImageViewer::new();
+    let mut app = JinnImageViewer::default();
     app.images = scan_folder(&temp);
     app.current_index = 1;
 
@@ -119,7 +121,7 @@ fn test_remove_entry_at() {
     create_test_image(&temp.join("b.png"), image::ImageFormat::Png).unwrap();
     create_test_image(&temp.join("c.png"), image::ImageFormat::Png).unwrap();
 
-    let mut app = JinnImageViewer::new();
+    let mut app = JinnImageViewer::default();
     app.images = scan_folder(&temp);
     assert_eq!(app.images.len(), 3);
 
@@ -134,7 +136,7 @@ fn test_remove_entry_adjust_index() {
     create_test_image(&temp.join("a.png"), image::ImageFormat::Png).unwrap();
     create_test_image(&temp.join("b.png"), image::ImageFormat::Png).unwrap();
 
-    let mut app = JinnImageViewer::new();
+    let mut app = JinnImageViewer::default();
     app.images = scan_folder(&temp);
     app.current_index = 1;
 
@@ -147,7 +149,7 @@ fn test_remove_all_entries() {
     let temp = setup_test_dir().unwrap();
     create_test_image(&temp.join("a.png"), image::ImageFormat::Png).unwrap();
 
-    let mut app = JinnImageViewer::new();
+    let mut app = JinnImageViewer::default();
     app.images = scan_folder(&temp);
     app.remove_entry_at(0);
 
@@ -160,7 +162,7 @@ fn test_rotate_cw() {
     let temp = setup_test_dir().unwrap();
     create_test_image(&temp.join("a.png"), image::ImageFormat::Png).unwrap();
 
-    let mut app = JinnImageViewer::new();
+    let mut app = JinnImageViewer::default();
     app.images = scan_folder(&temp);
 
     app.rotate_cw();
@@ -178,7 +180,7 @@ fn test_rotate_ccw() {
     let temp = setup_test_dir().unwrap();
     create_test_image(&temp.join("a.png"), image::ImageFormat::Png).unwrap();
 
-    let mut app = JinnImageViewer::new();
+    let mut app = JinnImageViewer::default();
     app.images = scan_folder(&temp);
 
     app.rotate_ccw();
@@ -193,7 +195,7 @@ fn test_rotate_independent_per_image() {
     create_test_image(&temp.join("a.png"), image::ImageFormat::Png).unwrap();
     create_test_image(&temp.join("b.png"), image::ImageFormat::Png).unwrap();
 
-    let mut app = JinnImageViewer::new();
+    let mut app = JinnImageViewer::default();
     app.images = scan_folder(&temp);
 
     // 旋转第一张
@@ -217,7 +219,7 @@ fn test_rotate_independent_per_image() {
 
 #[test]
 fn test_toggle_dual_column() {
-    let mut app = JinnImageViewer::new();
+    let mut app = JinnImageViewer::default();
     assert!(!app.two_column);
 
     app.two_column = !app.two_column;
@@ -229,7 +231,7 @@ fn test_toggle_dual_column() {
 
 #[test]
 fn test_scale_factor_modification() {
-    let mut app = JinnImageViewer::new();
+    let mut app = JinnImageViewer::default();
     let original = app.scale_factor;
 
     app.scale_factor = 2.0;
@@ -241,7 +243,7 @@ fn test_scale_factor_modification() {
 
 #[test]
 fn test_set_status_message() {
-    let mut app = JinnImageViewer::new();
+    let mut app = JinnImageViewer::default();
     app.set_status("测试消息".to_string());
     assert_eq!(app.status_message, "测试消息");
     assert!(app.status_message_time.is_some(), "应设置时间戳");
@@ -249,7 +251,7 @@ fn test_set_status_message() {
 
 #[test]
 fn test_clear_expired_status() {
-    let mut app = JinnImageViewer::new();
+    let mut app = JinnImageViewer::default();
     app.set_status("临时消息".to_string());
 
     // 模拟6秒后（超时阈值为5秒）

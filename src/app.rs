@@ -88,16 +88,19 @@ pub struct JinnImageViewer {
     pub slideshow_interval_secs: f64,
     pub image_sort_mode: ImageSortMode,
     pub image_sort_reversed: bool,
+    // 单实例 IPC：接收从命令行/文件关联传入的路径
+    pub ipc_rx: std::sync::mpsc::Receiver<String>,
 }
 
 impl Default for JinnImageViewer {
     fn default() -> Self {
-        Self::new()
+        let (_tx, rx) = std::sync::mpsc::channel();
+        Self::new(rx)
     }
 }
 
 impl JinnImageViewer {
-    pub fn new() -> Self {
+    pub fn new(ipc_rx: std::sync::mpsc::Receiver<String>) -> Self {
         Self {
             images: Vec::new(),
             current_index: 0,
@@ -146,6 +149,7 @@ impl JinnImageViewer {
             slideshow_interval_secs: 3.0,
             image_sort_mode: ImageSortMode::Date,
             image_sort_reversed: false,
+            ipc_rx,
         }
     }
 
@@ -974,6 +978,33 @@ impl JinnImageViewer {
             }
         }
     }
+
+    /// 处理通过 IPC 传入的路径（文件关联双击或第二个实例的命令行参数）。
+    /// 该路径将被当作文件打开，自动加载其所在目录并定位到该文件。
+    fn handle_ipc_paths(&mut self, ctx: &egui::Context) {
+        while let Ok(path_str) = self.ipc_rx.try_recv() {
+            let path = std::path::PathBuf::from(&path_str);
+            if path.is_dir() {
+                self.load_folder(path);
+            } else if path.is_file() {
+                if let Some(ext) = path.extension() {
+                    if !crate::image::is_supported_ext(ext) {
+                        continue;
+                    }
+                } else {
+                    continue;
+                }
+                if let Some(parent) = path.parent() {
+                    self.load_folder(parent.to_path_buf());
+                    let file_name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+                    if let Some(pos) = self.images.iter().position(|img| img.name == file_name) {
+                        self.current_index = pos;
+                    }
+                }
+            }
+            ctx.request_repaint();
+        }
+    }
 }
 
 // ============================================================================
@@ -998,6 +1029,9 @@ impl eframe::App for JinnImageViewer {
 
         // 处理拖放文件
         self.handle_dropped_files(ctx);
+
+        // 处理通过 IPC 传入的路径（来自文件关联双击或第二个实例的命令行参数）
+        self.handle_ipc_paths(ctx);
 
         // 自动清除超时状态消息
         self.clear_expired_status();

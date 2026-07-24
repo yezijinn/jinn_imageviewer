@@ -3,6 +3,7 @@ pub mod app;
 pub mod config;
 pub mod i18n;
 pub mod image;
+pub mod ipc;
 pub mod shortcuts;
 pub mod sorting;
 pub mod theme;
